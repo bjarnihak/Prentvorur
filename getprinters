@@ -9,8 +9,12 @@
 # run: printerconf-gen-so.sh ARGV > printers-so.cfg 2>/dev/null
 ###############################################################################
 
+# No external redirect - redirect all output to cotrrect place directly
+PRINTCONF=/usr/local/shinken/etc/hosts/printers.cfg
+exec > $PRINTCONF     	# stdout replaced with file "printers.cfg"
+
 # First, we create the configuration file header and template information
-cat<<'END'
+cat<<'END' > $PRINTCONF
 ###############################################################################
 # HOST GROUP DEFINITIONS printers
 ###############################################################################
@@ -149,9 +153,9 @@ command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w 
 ###############################################################################
 END
 
+# Just in case this one calls another we shall export $LOGFILE
 export LOGFILE=${LOGFILE:-"/tmp/prentvakt.log"}
 touch $LOGFILE
-
 CMDFILE=/boot/prentvakt.txt
 
 customer=$(cat $CMDFILE | grep -w customer | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
@@ -253,8 +257,6 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
       fi
     fi
 done
-
 echo "I found" `expr $cnt - 1` "printers during my scan" >> ${LOGFILE} 2>&1
-
 cat ${LOGFILE} | mail -s "Scanning logs" $email
 #rm ${LOGFILE}
