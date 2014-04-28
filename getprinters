@@ -1,0 +1,260 @@
+#!/bin/bash
+###############################################################################
+# This script does a auto-discovery of printers on networks by using ping
+# and snmpget cycling through a range of IP that is defined in a separate
+# network list file and IP range.
+#
+# 
+# Based on the work of frank4dd@com
+# run: printerconf-gen-so.sh ARGV > printers-so.cfg 2>/dev/null
+###############################################################################
+
+# First, we create the configuration file header and template information
+cat<<'END'
+###############################################################################
+# HOST GROUP DEFINITIONS printers
+###############################################################################
+define hostgroup{
+  hostgroup_name        generic-printers-so       ; The name of the hostgroup
+  alias                 Generic Printers           ; Alias details of the group
+}
+define hostextinfo {
+  hostgroup_name        generic-printers-so         ; The name of the hostgroup
+  use                   basic
+}
+define hostgroup{
+  hostgroup_name        xerox-printers-so           ; The name of the hostgroup
+  alias                 Xerox Printers in SO        ; Alias details of the group
+}
+define hostgroup{
+  hostgroup_name        kyocera-printers-so         ; The name of the hostgroup
+  alias                 Kyocera Printers in SO      ; Alias details of the group
+}
+define hostgroup{
+  hostgroup_name        HP-printers-so              ; The name of the hostgroup
+  alias                 Hewlewtt Packard in SO      ; Alias details of the group
+}
+define hostgroup{
+  hostgroup_name        epson-printers-so           ; The name of the hostgroup
+  alias                 epson prointers in SO       ; Alias details of the group
+}
+###############################################################################
+# PRINTER DEFINITION templates - These are NOT a real hosts, just a template!
+###############################################################################
+define host{
+  name                  generic-printer-so ; The name of this host template
+  use                   generic-host       ; Inherit default values from the generic-host template
+  check_period          24x7               ; monitor weekdays 8-8
+  check_interval        5                  ; Actively check the server every 5 minutes
+  retry_interval        1                  ; Schedule host check retries at 1 minute intervals
+  max_check_attempts    5                  ; Check each server 10 times (max)
+  check_command         check_host_alive   ; Default command to check if servers are "alive"
+  #check_command         check_hpjd         ; Default command to check if servers are "alive"
+  notification_period   none               ; printers enter "sleep" mode each night - they go "down"
+  notification_interval 240                ; Resend notifications every 120 minutes
+  notification_options  d,u,r              ; Only send notifications for specific host states
+  contact_groups        admins
+  hostgroups            printers-salesoffice, 8-all-printers
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  HP-printer-so      ; The name of this host template
+  use                   generic-host       ; Inherit default values from the generic-host template
+  check_period          24x7               ; monitor weekdays 8-8
+  check_interval        5                  ; Actively check the server every 5 minutes
+  retry_interval        1                  ; Schedule host check retries at 1 minute intervals
+  max_check_attempts    5                  ; Check each server 10 times (max)
+  #check_command         check_hpjd         ; Default command to check if servers are "alive"
+  check_command         check_host_alive   ; Default command to check if servers are "alive"
+  notification_period   none               ; printers enter "sleep" mode each night - they go "down"
+  notification_interval 240                ; Resend notifications every 120 minutes
+  notification_options  d,u,r              ; Only send notifications for specific host states
+  contact_groups        admins             ;
+  hostgroups            HP-printers-so     ;
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  epson-printer-so   ; The name of this host template
+  use                   generic-host       ; Inherit default values from the generic-host template
+  check_period          24x7               ; monitor weekdays 8-8
+  check_interval        5                  ; Actively check the server every 5 minutes
+  retry_interval        1                  ; Schedule host check retries at 1 minute intervals
+  max_check_attempts    5                  ; Check each server 10 times (max)
+  check_command         check_host_alive   ; 
+  notification_period   none               ; printers enter "sleep" mode each night - they go "down"
+  notification_interval 240                ; Resend notifications every 120 minutes
+  notification_options  d,u,r              ; Only send notifications for specific host states
+  contact_groups        admins             ;
+  hostgroups            epson-printers-so  ;
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  xerox-printer-so   ; The name of this host template
+  use                   generic-printer-so ; Inherit default values from the generic-host template
+  hostgroups            xerox-printers-so, printers-salesoffice, 8-all-printers
+  icon_image            xerox-logo.png     ; the default image for the device
+  statusmap_image       xerox-logo.gd2     ; the default image for the statusmap display
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  kyocera-printer-so ; The name of this host template
+  use                   generic-printer-so ; Inherit default values from the generic-host template
+  hostgroups            kyocera-printers-so; 
+  icon_image            kyocera-logo.png   ; the default image for the device
+  statusmap_image       kyocera-logo.gd2   ; the default image for the statusmap display
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  HP-printer-so      ; The name of this host template
+  use                   HP-printer-so      ; Inherit default values from the generic-host template
+  hostgroups            HP-printers-so     ; HP printers
+  icon_image            HP-logo.png        ; the default image for the device
+  statusmap_image       HP-logo.gd2        ; the default image for the statusmap display
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+define host{
+  name                  epson-printer-so   ; The name of this host template
+  use                   epson-printer-so   ; Inherit default values from the generic-host template
+  hostgroups            epson-printers-so  ; HP printers
+  icon_image            epson-logo.png     ; the default image for the device
+  statusmap_image       epson-logo.gd2     ; the default image for the statusmap display
+  register              0                  ; DONT REGISTER THIS - ITS JUST A TEMPLATE
+}
+###############################################################################
+# PRINTER services and commands
+###############################################################################
+
+define service{ 
+use generic-service 
+service_description Toner Supply 
+hostgroup_name (generic-printers-so|HP-printers-so|epson-printers-so)
+check_command check_snmp_printer!public!"CONSUM ALL"!20!10 
+} 
+
+#define service{ 
+#use generic-service 
+#service_description Printer Status 
+#hostgroup_name (generic-printers-so|epson-printers-so|HP-printers-so)
+#check_command check_snmp_printer!public!"STATUS" 
+#} 
+
+define command{ 
+command_name check_snmp_printer 
+command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w $ARG3$ -c $ARG4$  
+} 
+
+
+###############################################################################
+# PRINTER DEFINITIONS below
+###############################################################################
+END
+
+export LOGFILE=${LOGFILE:-"/tmp/prentvakt.log"}
+touch $LOGFILE
+
+CMDFILE=/boot/prentvakt.txt
+
+customer=$(cat $CMDFILE | grep -w customer | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
+soip=$(cat $CMDFILE | grep -w  subnet | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
+email=$(cat $CMDFILE | grep -w  email | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
+myip=$(cat $CMDFILE | grep -w  myip | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
+
+if [ ! $soip ] #If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and use current IP (first interface).
+	then
+	myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
+	# And we need the subnet as well iqf it is not passed on to us.
+	soip=${myip%.*}
+	fi
+
+#Let us log what we have before we go any further
+echo "Customer is: "$customer >> ${LOGFILE} 2>&1
+echo "Emails will be sent to: " $email  >> ${LOGFILE} 2>&1
+echo "Systems current IP number is : " $myip  >> ${LOGFILE} 2>&1
+echo "Printers subnet is : " $soip >> ${LOGFILE} 2>&1
+
+
+ip2dec () { 
+    local a b c d ipd=$@
+    IFS=. read -r a b c d <<< "$ipd"
+    printf '%d\n' "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
+}
+
+dec2ip () {
+    local ipi dec=$@
+    for e in {3..0}
+    do
+        ((octet = dec / (256 ** e) )) 
+        ((dec -= octet * 256 ** e))
+        ipi+=$delim$octet
+        delim=.
+    done
+    printf '%s\n' "$ipi"
+}
+
+decimal=$(ip2dec $soip)
+
+START_CONV=$(dec2ip $decimal +2) # we will not want to 0 or one as printer IP address.
+END_CONV=$(dec2ip $decimal +253) # we dont want 254 or 255 as printer IP address
+
+START_RANGE=$(echo $START_CONV | awk -F"." '{print $4}') #We only want the last digit
+END_RANGE=$(echo $END_CONV | awk -F"." '{print $4}') #We only want the last digit
+
+#debug
+echo "START_RANGE is:" $START_RANGE >> ${LOGFILE} 2>&1
+echo "END_RANGE is:"$END_RANGE >> ${LOGFILE} 2>&1
+
+cnt=1  # For creating unique printer name in def.
+
+range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bash`
+
+#echo "ECHOING RANGE: "$range >> ${LOGFILE} 2>&1
+# No redirects in loop
+  for ip in $range; do
+    # check if the system exists at all and ip pingeable
+    #echo "IP: $soip.$ip" #Debugging
+    fping -c 1 -q $soip.$ip 2>/dev/null
+    # if fping received a response, the exit code will be 0
+    if [ $? -eq 0 ]; then
+      #snmpget -v 1 -c public 192.168.91.4 HOST-RESOURCES-MIB::hrDeviceDescr.1 -Ov
+      response=`snmpget -r 1 -v 1 -c public $soip.$ip HOST-RESOURCES-MIB::hrDeviceDescr.1 -Ov 2>/dev/null` 
+      # if snmpget received a response, the exit code will be 0
+      if [ $? -eq 0 ]; then
+        # For printers we get
+        # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
+        # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
+        echo "define host{"
+        # check if we got a Kyocera
+        echo $response| grep -q 'STRING: LS-'
+        if [ $? -eq 0 ]; then echo "  use                   kyocera-printer-so"
+        else
+          # check if we got a Xerox
+          echo $response| grep -q 'STRING: FUJI XEROX'
+          if [ $? -eq 0 ]; then echo "  use                   xerox-printer-so"
+	  else
+            # check if we got a Epson
+            echo $response| grep -q 'STRING: EPSON'
+            if [ $? -eq 0 ]; then echo "  use                   epson-printer-so"
+	    else
+		# check if we got a Epson
+            	echo $response| grep -q 'STRING: HP\|STRING: Deskjet\|STRING: Officejet'
+            	if [ $? -eq 0 ]; then echo "  use                   HP-printer-so"
+            	else
+              		         echo "  use                   generic-printer-so"
+	    fi
+           fi
+          fi
+        fi
+        echo "  alias             $customer-test-printer-$cnt"
+        #echo "  alias            $customer-printer-$cnt (`echo $response| cut -d ' ' -f 2-5` $cnt)"
+        echo "  host_name        `echo $response| cut -d ' ' -f 2-5` $cnt"
+        echo "  address           $soip.$ip"
+        echo "}"
+        cnt=`expr $cnt + 1`
+      fi
+    fi
+done
+
+echo "I found" `expr $cnt - 1` "printers during my scan" >> ${LOGFILE} 2>&1
+
+cat ${LOGFILE} | mail -s "Scanning logs" $email
+#rm ${LOGFILE}
