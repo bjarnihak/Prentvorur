@@ -154,18 +154,17 @@ command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w 
 END
 
 # Just in case this one calls another we shall export $LOGFILE
-export LOGFILE=${LOGFILE:-"/tmp/prentvakt.log"}
-touch $LOGFILE
+export LOGFILE=${LOGFILE:-"/tmp/startup.log"}
 
 # stdout replaced with file "printers.cfg"
 #exec > $PRINTCONF     	
 
 #Get our stuff from the SD card
 CMDFILE=/boot/prentvakt.txt
-customer=$(cat $CMDFILE | grep -w customer | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-soip=$(cat $CMDFILE | grep -w  subnet | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
-email=$(cat $CMDFILE | grep -w  email | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-myip=$(cat $CMDFILE | grep -w  myip | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
+customer=$(cat $CMDFILE | grep -w CUSTOMER | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
+soip=$(cat $CMDFILE | grep -w  SUBNET | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
+email=$(cat $CMDFILE | grep -w  EMAIL | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
+myip=$(cat $CMDFILE | grep -w  MYIP | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
 
 # Main 
 #
@@ -180,10 +179,10 @@ if [ ! $soip ]
 	fi
 
 #Let us log what we have before we go any further
-echo "Customer is: "$customer >> ${LOGFILE} 2>&1
-echo "Emails will be sent to: " $email  >> ${LOGFILE} 2>&1
-echo "Systems current IP number is : " $myip  >> ${LOGFILE} 2>&1
-echo "Printers subnet is : " $soip >> ${LOGFILE} 2>&1
+#echo "Customer is: "$customer >> ${LOGFILE} 2>&1
+#echo "Emails will be sent to: " $email  >> ${LOGFILE} 2>&1
+#echo "Systems current IP number is : " $myip  >> ${LOGFILE} 2>&1
+#echo "Printers subnet is : " $soip >> ${LOGFILE} 2>&1
 
 
 ip2dec () { 
@@ -213,8 +212,10 @@ START_RANGE=$(echo $START_CONV | awk -F"." '{print $4}') #We only want the last 
 END_RANGE=$(echo $END_CONV | awk -F"." '{print $4}') #We only want the last digit
 
 #debug
-echo "START_RANGE is:" $START_RANGE >> ${LOGFILE} 2>&1
-echo "END_RANGE is:"$END_RANGE >> ${LOGFILE} 2>&1
+echo "Confirming my start range (getprinter) is:" $START_RANGE >> ${LOGFILE} 2>&1
+echo "Confirming my start range (getprinter) is:"$END_RANGE >> ${LOGFILE} 2>&1
+echo "Starting" >> ${LOGFILE} 2>&1
+echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
 
 cnt=1  # For creating unique printer name in def.
 
@@ -268,5 +269,6 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
     fi
 done
 echo "I found" `expr $cnt - 1` "printers during my scan" >> ${LOGFILE} 2>&1
-cat ${LOGFILE} | mail -s "Scanning logs" $email 2> /tmp/mailerrorp
+echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
+#cat ${LOGFILE} | mail -s "Scanning logs" $email 2> /tmp/mailerrorp
 #rm ${LOGFILE}

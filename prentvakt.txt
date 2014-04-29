@@ -1,9 +1,9 @@
 =======================================
 #Config file for Print Supply Monitor #
 #======================================
-CUSTOMER=Bjarni 
+CUSTOMER=Prentvorur 
 SUBNET=
 MYIP=
-EMAIL=bh@islaw.is
+EMAIL=bjarni@prentvorur.is
 START_RANGE=2
 END_RANGE=253
