@@ -1,0 +1,9 @@
+=======================================
+#Config file for Print Supply Monitor #
+#======================================
+CUSTOMER=Bjarni 
+SUBNET=
+MYIP=
+EMAIL=bh@islaw.is
+START_RANGE=2
+END_RANGE=253
