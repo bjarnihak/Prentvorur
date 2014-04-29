@@ -1,16 +1,34 @@
 #!/bin/bash
 #
-# Translate IP to decimal +range where it creates START_RANGE and END_RANGE for our scan.
+# Translate IP to decimal +range where it creates START_RANGE and END_RANGE 
+# for our scan.
 # Get our subnet if it is not passed on.
-
+#
+#First we need the logfile 
+#===========================================================================
 LOGFILE=/tmp/startup.log
 touch $LOGFILE
+# Parameters from SD card.
 CMDFILE=/boot/prentvakt.txt
-
 customer=$(cat $CMDFILE | grep -w customer | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
 soip=$(cat $CMDFILE | grep -w  subnet | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
 email=$(cat $CMDFILE | grep -w  email | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-myip=$(cat $CMDFILE | grep -w  myip | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
+myip=$(cat $CMDFILE | grep -w  myip | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # Just for the email and URL's 
+
+# Email Parameters
+#=========================================================================
+EMAIL_SUBJECT_CONTEXT="Initial startup email at $customer"
+EMAIL_RECIPIENT="bh@islaw.is"
+EMAIL_SENDER="Prentvakt"
+
+# Various Parameters
+#=========================================================================
+TIMESTAMP=`date +%F-%H.%M.%S`
+TODAYS_DATE=`date +%Y-%m-%d`
+SCRIPT_PATH=/home/vaktin/repo
+
+# Main code
+#==========================================================================
 
 if [ ! $soip ] #If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and use current IP (first interface).
 	then
@@ -54,15 +72,22 @@ echo "Printer scanning start range is: "$START_RANGE  >> ${LOGFILE} 2>&1
 echo "Printer scanning end range is. "$END_RANGE  >> ${LOGFILE} 2>&1
 echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
 
- #cat /boot/config.txt | grep "customer\|subnet" | mail -s "here is your config logs" bh@islaw.is < /tmp/prentv.log >> ${LOGFILE} 2>&1
- printf "I am up and running and attached are my initial installation logs. \n
- Config address: http://$myip/config.html if you whis to change the automatic configuration.\n
- Monitoring address: http://$myip:7767/ if you wish to see how your printers are doing.\n
+ printf "System has started and attached are the initial installation logs.\n
+ Config URL is: \n
+ http://$myip/config.html if you whis to change the automatic configuration.\n
+ Monitoring URL is: \n
+ http://$myip:7767/ if you wish to see how your printers are doing.\n
+ Soon you will get the results by email.
  \n
- Have a nice day!" | mutt  -s "Startup notification-at boot" $email  -a $LOGFILE 2>/dev/null #No sence in logging this one - is there?
-sleep 20 
-echo "begin getprinters.sh " 
-echo "begin getprinters.sh" >> ${LOGFILE} 
-/home/vaktin/getprinters.sh > /usr/local/shinken/etc/hosts/printers.cfg 
+ Have a nice day! \n
+\n
+You can soon expect the results of printer scan by email. \n\n " | mutt  -s "$EMAIL_SUBJECT_CONTEXT" $email -a $LOGFILE 
 
-#rm $LOGFILE
+#sleep 20 
+#echo "begin getprinters.sh " 
+#echo "begining finding printers getprinters.sh" >> ${LOGFILE} 
+#/home/vaktin/repo/getprinters  
+
+#echo "Results of initial setup " >> $LOGFILE
+#/bin/sh "$SCRIPT_PATH/email_sender.sh" "$EMAIL_RECIPIENT" "$EMAIL_SENDER" "$EMAIL_SUBJECT_CONTEXT" "$(cat $LOGFILE)"
+rm $LOGFILE

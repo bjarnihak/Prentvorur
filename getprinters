@@ -11,7 +11,7 @@
 
 # No external redirect - redirect all output to cotrrect place directly
 PRINTCONF=/usr/local/shinken/etc/hosts/printers.cfg
-exec > $PRINTCONF     	# stdout replaced with file "printers.cfg"
+# stdout replaced with file "printers.cfg"
 
 # First, we create the configuration file header and template information
 cat<<'END' > $PRINTCONF
@@ -135,12 +135,12 @@ hostgroup_name (generic-printers-so|HP-printers-so|epson-printers-so)
 check_command check_snmp_printer!public!"CONSUM ALL"!20!10 
 } 
 
-#define service{ 
-#use generic-service 
-#service_description Printer Status 
-#hostgroup_name (generic-printers-so|epson-printers-so|HP-printers-so)
-#check_command check_snmp_printer!public!"STATUS" 
-#} 
+define service{ 
+use generic-service 
+service_description Printer Total Page Count 
+hostgroup_name (generic-printers-so|epson-printers-so|HP-printers-so)
+check_command check_snmp_printer!public!"PAGECOUNT" 
+} 
 
 define command{ 
 command_name check_snmp_printer 
@@ -156,14 +156,23 @@ END
 # Just in case this one calls another we shall export $LOGFILE
 export LOGFILE=${LOGFILE:-"/tmp/prentvakt.log"}
 touch $LOGFILE
-CMDFILE=/boot/prentvakt.txt
 
+# stdout replaced with file "printers.cfg"
+#exec > $PRINTCONF     	
+
+#Get our stuff from the SD card
+CMDFILE=/boot/prentvakt.txt
 customer=$(cat $CMDFILE | grep -w customer | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
 soip=$(cat $CMDFILE | grep -w  subnet | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
 email=$(cat $CMDFILE | grep -w  email | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
 myip=$(cat $CMDFILE | grep -w  myip | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
 
-if [ ! $soip ] #If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and use current IP (first interface).
+# Main 
+#
+#If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and 
+#use current IP (first interface).
+
+if [ ! $soip ] 
 	then
 	myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
 	# And we need the subnet as well iqf it is not passed on to us.
@@ -226,6 +235,7 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
         # For printers we get
         # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
         # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
+		exec >> $PRINTCONF
         echo "define host{"
         # check if we got a Kyocera
         echo $response| grep -q 'STRING: LS-'
@@ -248,15 +258,15 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
            fi
           fi
         fi
-        echo "  alias             $customer-test-printer-$cnt"
+        echo "  alias             $customer-printer-$cnt"
         #echo "  alias            $customer-printer-$cnt (`echo $response| cut -d ' ' -f 2-5` $cnt)"
-        echo "  host_name        `echo $response| cut -d ' ' -f 2-5` $cnt"
-        echo "  address           $soip.$ip"
+        echo "  host_name            `echo $response| cut -d ' ' -f 2-5` $cnt"
+        echo "  address              $soip.$ip"
         echo "}"
         cnt=`expr $cnt + 1`
-      fi
+		fi
     fi
 done
 echo "I found" `expr $cnt - 1` "printers during my scan" >> ${LOGFILE} 2>&1
-cat ${LOGFILE} | mail -s "Scanning logs" $email
+cat ${LOGFILE} | mail -s "Scanning logs" $email 2> /tmp/mailerrorp
 #rm ${LOGFILE}
