@@ -154,7 +154,7 @@ command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w 
 END
 
 #stop shinken
-. /usr/local/bin/shmotor "stop"   > /dev/null 2>&1
+#echo anik2008 | sudo -S /usr/local/bin/shmotor  "stop"   #> /dev/null 2>&1
 
 # Log file handling
 get_logfile=/tmp/get_logfile
@@ -332,10 +332,9 @@ done
 echo "I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
 echo "----------------------------------------------------------------------------------" >> $get_logfile
 
-#echo "starting shinken"
+echo "Restarting shinken" >> $get_logfile
 
-. /usr/local/bin/shmotor "start"  > /dev/null 2>&1
-wait
+. /usr/local/bin/shmotor "restart"  >> $get_logfile
 
-#rm $get_logfile
+
 
