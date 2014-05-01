@@ -1,19 +1,20 @@
-#!/bin/bash
+#!/bin/bash 
 #
-# Translate IP to decimal +range where it creates START_RANGE and END_RANGE 
+# Translate IP to decimal +range where it creates my_start_range and my_end_range 
 # for our scan.
 # Get our subnet if it is not passed on.
 #
 #First the basics
 #=========================================================================
-export LOGFILE=/tmp/startup.log
-touch $LOGFILE
-sleep 2
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-echo "Preparing Configuration of Prentvakt." >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-. /home/vaktin/repo/restart "stop"  >> ${LOGFILE} 2>&1
-sleep 5
+log_file=/tmp/startup.log
+touch $log_file
+get_logfile=/tmp/get_logfile
+touch $get_logfile
+
+# Empty the previous log with > on first occasion of redirect
+echo "----------------------------------------------------------------------------------" > ${log_file} 
+echo "Preparing Configuration of Prentvakt." >> ${log_file} 
+echo "----------------------------------------------------------------------------------" >> ${log_file} 
 
 # Handling parameters from SD card. We used the boot on the 
 
@@ -22,44 +23,62 @@ if [ -f /boot/prentvakt.txt ] ; then
 		chmod 777 /home/vaktin/repo/prentvakt.txt
 fi
 
-CMDFILE=/home/vaktin/repo/prentvakt.txt
+cmd_file=/home/vaktin/repo/prentvakt.txt
+# Lots of problems from Windows and others making config files = fix it.
+for file in /home/vaktin/repo/*.txt ; do
+    dos2unix "$file" >> /dev/null 2>&1
+done
 
-# Use the information available.
+# Use the information from SD card if available.
 #=========================================================================
-customer=$(cat $CMDFILE | grep -w CUSTOMER | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-# $soip is the subnet for example 192.168.1
-soip=$(cat $CMDFILE | grep -w SUBNET | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 
-email1=$(cat $CMDFILE | grep -w EMAIL | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-# Just for the email and URL's 
-myip=$(cat $CMDFILE | grep -w MYIP | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 
 
-# Email Parameters
+# Load file into array. Save I/O's on Rasp
+declare -a my_parameter
+let i=0
+while IFS=$'"="' read -r line_data; do
+    my_parameter[i]="${line_data}"
+    ((++i))
+done < $cmd_file
+ 
+customer=$(printf ${my_parameter[0]} | awk -F '*|=' '{print $2}')
+subnet=$(printf ${my_parameter[1]} | awk -F '*|=' '{print $2}')
+myip=$(printf ${my_parameter[2]} | awk -F '*|=' '{print $2}')
+email=$(printf ${my_parameter[3]} | awk -F '*|=' '{print $2}')
+my_start_range=$(printf ${my_parameter[4]} | awk -F '*|=' '{print $2}')
+my_end_range=$(printf ${my_parameter[5]} | awk -F '*|=' '{print $2}')
+
+# Debug
+#echo "--->" $customer
+#echo "--->" $subnet
+#echo "--->" $myip
+#echo "--->" $email
+#echo "--->" $my_start_range
+#echo "--->" $my_end_range
+
+# Email Parameters -
 #=========================================================================
-EMAIL_RECIPIENT="vaktin@prentvorur.net"
-EMAIL_SUBJECT_CONTEXT="Initial startup email at $customer"
-EMAIL_SENDER="Prentvakt"
-TEMPLATE=/tmp/template
-SSMTP="$(which ssmtp)"
+if [[ -z $email ]]; then 
+		email_recipient="vaktin@prentvorur.is"
+	else
+		email_recipient="$email"
+fi
+email_subject_context="Initial startup email at $customer"
+email_sender="prentvakt@prentvorur.is" # Actually rewritten on send by ssmt
+template=/tmp/template
+email_prog="$(which email_sender)"
 
 # Various Parameters
 #=========================================================================
-TIMESTAMP=`date +%H.%M`
-TODAYS_DATE=`date +%d-%m-%Y`
-SCRIPT_PATH=/home/vaktin/repo
+timestamp=`date +%H:%M`
+todays_date=`date +%d/%m/%Y`
+script_path=/home/vaktin/repo/
 
 # Main code
-#==========================================================================
+#=========================================================================
+# Start with functions
+#=========================================================================
 
-if [ -n $myip ]; then
-	# And we need our ip if it was not passed on to us.
-	myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}'); 
-fi 
-
-#If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and use current IP (first interface).
-if [ -n $soip ]; then
-	# And we need the subnet as well if it is not passed on to us.
-	soip=${myip%.*}
-fi
+debug() { echo "DEBUG: $*" >&2; }
 
 ip2dec () {
     local a b c d ip=$@
@@ -71,65 +90,92 @@ dec2ip () {
     local ip dec=$@
     for e in {3..0}
     do
-        ((octet = dec / (256 ** e) )) >> ${LOGFILE} 2>&1
-        ((dec -= octet * 256 ** e)) >> ${LOGFILE} 2>&1
+        ((octet = dec / (256 ** e) )) 
+        ((dec -= octet * 256 ** e)) 
         ip+=$delim$octet
         delim=.
     done
     printf '%s\n' "$ip"
 }
 
-decimal=$(ip2dec $soip)
+# Other code
+#=========================================================================
+# And we need our ip if it was not passed on to us.
+if [[ -z $myip ]]; then
+	#echo "myip is null or space"
+	  myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
+fi 
 
-START_RANGE=$(dec2ip $decimal +2) # we will not want to 0 or one as printer IP address.
-END_RANGE=$(dec2ip $decimal +253) # we dont want 254 or 255 as printer IP address
+# If nothing was passed to us from config.txt about printers subnet then we figure it out 
+# and use current IP (first interface).
+if [[ -z $soip ]]; then
+	#echo "soip is null or space"
+	getsub=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
+	soip=${getsub%.*}
+fi
 
- 
-# Log scanning range for debug
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-echo "Starting the run on the  $TODAYS_DATE " >> ${LOGFILE} 2>&1
-echo "At $TIMESTAMP hours" >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-echo "Customer is: "$customer >> ${LOGFILE} 2>&1
-echo "Emails are to be sent email to: " $email >> ${LOGFILE} 2>&1
-echo "Systems current IP number is: " $myip >> ${LOGFILE} 2>&1
-echo "Printers subnet is:" $soip >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-echo "Printer scanning start range is: "$START_RANGE  >> ${LOGFILE} 2>&1
-echo "Printer scanning end range is. "$END_RANGE  >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-echo ""
-echo "Begining finding printers "  >> ${LOGFILE} 2>&1
+# Prepare range and ip calc
+if [[ -n $soip ]]; then
+	decimal=$(ip2dec $soip)
+fi
 
-# start search
+if [[ -n $my_start_range ]] ; then
+	my_start_range=$(dec2ip $decimal + $my_start_range )
+	#echo "Got my_start_range :"
+else
+	my_start_range=$(dec2ip $decimal + 2 ) 
+	#echo "Assinging Standard start"
+fi
 
-. /home/vaktin/repo/getprinters 
-sleep 5
-. /home/vaktin/repo/restart "start"  >> ${LOGFILE} 2>&1
-echo " " >> ${LOGFILE} 2>&1
-echo "Finished. Check your email." >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-sleep 2
+if [[ -n $my_end_range ]] ; then
+	my_end_range=$(dec2ip $decimal + $my_end_range )
+	#echo "Got my_end_range :"
+else
+	my_end_range=$(dec2ip $decimal + 253 ) 
+	#echo "Assinging Standard end" 
+fi
 
-BODY=$(printf "System has started and attached are the initial installation logs.\n
- Config URL is: \n
- http://$myip/cgi-bin/config.cgi if you whis to change the automatic configuration.\n
- Monitoring URL is: \n
- http://$myip:7767/all if you wish to see how your printers are doing.\n
- Soon you will get the results by email.
- \n
- Have a nice day! \n
-\n
-You can soon expect the results of printer scan by email. \n\n ") # | mutt  -s "$EMAIL_SUBJECT_CONTEXT" $email1 -a $LOGFILE 
 
-# Send the email
-echo "To: $EMAIL_RECIPIENT" > $TEMPLATE
-echo "Cc: $email" >> $TEMPLATE
-echo "From: $EMAIL_SENDER" >> $TEMPLATE
-echo "Subject: $EMAIL_SUBJECT_CONTEXT" >> $TEMPLATE
-echo " " >> $TEMPLATE
-echo  "$BODY" >> $TEMPLATE
 
-$SSMTP $EMAIL_RECIPIENT < $TEMPLATE
-#rm $TEMPLATE
-#rm $LOGFILE
+# Preparing the log_file soon to turn into email
+body=$(printf "
+You can use the following URL's after the system has configured.\n
+Config URL is: http://$myip/cgi-bin/config.cgi  \n
+Monitoring URL is: http://$myip:7767/all \n
+Please find below the logs generated during the install.\n
+Have a nice day! \n
+
+Please give the system few minutes to initialize. \n\n ") 
+
+
+echo "$body" >> ${log_file}
+echo "----------------------------------------------------------------------------------" >> ${log_file} 
+echo "Starting the run on the  $todays_date " >> ${log_file} 
+echo "At $timestamp hours" >> ${log_file} 
+echo "----------------------------------------------------------------------------------" >> ${log_file} 
+echo "Customer is: "$customer >> ${log_file} 
+echo "Emails are to be sent email to: " $email  >> ${log_file}
+echo "----------------------------------------------------------------------------------" >> ${log_file}
+echo "Systems current IP number is: " $myip  >> ${log_file}
+echo "Printers subnet is:" $soip >> ${log_file}
+echo "Printer scanning start range is: " $my_start_range  >> ${log_file}
+echo "Printer scanning end range is: " $my_end_range  >> ${log_file}
+echo "----------------------------------------------------------------------------------" >> ${log_file} 
+echo "" >> ${log_file}
+echo "Finding printers: $timestamp "  >> ${log_file} 
+sleep 1
+# starting search
+#echo "starting searching - getprinters"
+
+. /home/vaktin/repo/getprinters >> ${log_file} 2>&1
+wait
+
+echo " " >> ${log_file} 
+echo "Finished definition: $timestamp" >> ${log_file} 
+echo "----------------------------------------------------------------------------------" >> ${log_file} 
+
+cat $get_logfile >> ${log_file}
+rm $get_logfile
+
+. "$email_prog" "$email_recipient" "$email_sender" "$email_subject_context " "$(cat ${log_file})" 
+

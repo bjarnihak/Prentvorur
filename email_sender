@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 Now=$(date +"%Y-%m-%d")
 SSMTP="$(which ssmtp)"
 

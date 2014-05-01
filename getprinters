@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 ###############################################################################
 # This script does a auto-discovery of printers on networks by using ping
 # and snmpget cycling through a range of IP that is defined in a separate
@@ -153,79 +153,139 @@ command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w 
 ###############################################################################
 END
 
-# Just in case this one calls another we shall export $LOGFILE
-export LOGFILE=${LOGFILE:-"/tmp/startup.log"}
+#stop shinken
+. /usr/local/bin/shmotor "stop"   > /dev/null 2>&1
 
-# stdout replaced with file "printers.cfg"
-#exec > $PRINTCONF     	
+# Log file handling
+get_logfile=/tmp/get_logfile
+touch $get_logfile
 
-#Get our stuff from the SD card
-CMDFILE=/boot/prentvakt.txt
-customer=$(cat $CMDFILE | grep -w CUSTOMER | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-soip=$(cat $CMDFILE | grep -w  SUBNET | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # $soip is the subnet for example 192.168.1
-email=$(cat $CMDFILE | grep -w  EMAIL | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1
-myip=$(cat $CMDFILE | grep -w  MYIP | awk -F '*|=' '{print $2}') >> ${LOGFILE} 2>&1 # I have a fixed IP number 
+# Lots of problems from Windows and others making config files = fix it.
+for file in /home/vaktin/repo/*.txt ; do
+    dos2unix "$file" > /dev/null 2>&1
+done
 
-# Main 
-#
-#If nothing was passed to us from config.txt about printers subnet then we figure it out ourselfes and 
-#use current IP (first interface).
+# Load file into array. Save I/O's on Rasp
+# Parameters kept in:
+cmd_file=/home/vaktin/repo/prentvakt.txt
 
-if [ ! $soip ] 
-	then
-	myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
-	# And we need the subnet as well iqf it is not passed on to us.
-	soip=${myip%.*}
-	fi
+declare -a my_parameter
+let i=0
+while IFS=$'"="' read -r line_data; do
+    my_parameter[i]="${line_data}"
+    ((++i))
+done < $cmd_file
 
-#Let us log what we have before we go any further
-#echo "Customer is: "$customer >> ${LOGFILE} 2>&1
-#echo "Emails will be sent to: " $email  >> ${LOGFILE} 2>&1
-#echo "Systems current IP number is : " $myip  >> ${LOGFILE} 2>&1
-#echo "Printers subnet is : " $soip >> ${LOGFILE} 2>&1
+# We only call awk = little I/O 
+customer=$(printf ${my_parameter[0]} | awk -F '*|=' '{print $2}')
+soip=$(printf ${my_parameter[1]} | awk -F '*|=' '{print $2}')
+myip=$(printf ${my_parameter[2]} | awk -F '*|=' '{print $2}')
+email=$(printf ${my_parameter[3]} | awk -F '*|=' '{print $2}')
+my_start_range=$(printf ${my_parameter[4]} | awk -F '*|=' '{print $2}')
+my_end_range=$(printf ${my_parameter[5]} | awk -F '*|=' '{print $2}')
 
+# Debug
+#echo $customer
+#echo $soip
+#echo $myip
+#echo $email
+#echo $my_start_range
+#echo $my_end_range
 
-ip2dec () { 
-    local a b c d ipd=$@
-    IFS=. read -r a b c d <<< "$ipd"
+# Email Parameters
+#=========================================================================
+if [[ -z $email ]]; then 
+		email_recipient="vaktin@prentvorur.is"
+	else
+		email_recipient="$email"
+fi
+email_subject_context="Reconfiguring at $customer"
+email_sender="prentvakt@prentvorur.is" # Actually rewritten on send by ssmt
+template=/tmp/template
+email_prog="$(which email_sender)"
+
+# Various Parameters
+#=========================================================================
+timestamp=`date +%H:%M`
+todays_date=`date +%d/%m/%Y`
+script_path=/home/vaktin/repo/
+
+# Main code
+#=========================================================================
+# Start with functions
+#=========================================================================
+
+debug() { echo "DEBUG: $*" >&2; }
+
+ip2dec () {
+    local a b c d ip=$@
+    IFS=. read -r a b c d <<< "$ip"
     printf '%d\n' "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
 }
 
 dec2ip () {
-    local ipi dec=$@
+    local ip dec=$@
     for e in {3..0}
     do
         ((octet = dec / (256 ** e) )) 
-        ((dec -= octet * 256 ** e))
-        ipi+=$delim$octet
+        ((dec -= octet * 256 ** e)) 
+        ip+=$delim$octet
         delim=.
     done
-    printf '%s\n' "$ipi"
+    printf '%s\n' "$ip"
 }
 
-decimal=$(ip2dec $soip)
+# Other code
+#=========================================================================
+# And we need our ip if it was not passed on to us.
+if [[ -z $myip ]]; then
+	#echo "myip is null or space"
+	  myip=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
+fi 
 
-START_CONV=$(dec2ip $decimal +2) # we will not want to 0 or one as printer IP address.
-END_CONV=$(dec2ip $decimal +253) # we dont want 254 or 255 as printer IP address
+# If nothing was passed to us from config.txt about printers subnet then we figure it out 
+# and use current IP (first interface).
+if [[ -z $soip ]]; then
+	#echo "soip is null or space"
+	getsub=$(ip route get 8.8.8.8 | awk '/8.8.8.8/ {print $NF}') 
+	soip=${getsub%.*}
+fi
 
-START_RANGE=$(echo $START_CONV | awk -F"." '{print $4}') #We only want the last digit
-END_RANGE=$(echo $END_CONV | awk -F"." '{print $4}') #We only want the last digit
+#echo $soip #debug
+# Prepare range and ip calc
+if [[ -n $soip ]]; then
+	decimal=$(ip2dec $soip)
+fi
 
-#debug
-echo "Confirming my start range (getprinter) is:" $START_RANGE >> ${LOGFILE} 2>&1
-echo "Confirming my start range (getprinter) is:"$END_RANGE >> ${LOGFILE} 2>&1
-echo "Starting" >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
+if [[ -n $my_start_range ]] ; then
+	my_start_range=$(dec2ip $decimal + $my_start_range )
+	#echo "Got my_start_range :"
+else
+	my_start_range=$(dec2ip $decimal + 2 ) 
+	echo "Assinging Standard start"
+fi
+
+if [[ -n $my_end_range ]] ; then
+	my_end_range=$(dec2ip $decimal + $my_end_range )
+	#echo "Got my_end_range :"
+else
+	my_end_range=$(dec2ip $decimal + 253 ) 
+	echo "Assinging Standard end" 
+fi
+
+#prepare to feed this to snmp
+start_range=$(echo $my_start_range | awk -F"." '{print $4}') #We only want the last digit
+end_range=$(echo $my_end_range | awk -F"." '{print $4}') #We only want the last digit
 
 cnt=1  # For creating unique printer name in def.
 
-range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bash`
+range=`echo -e "for i in {$start_range..$end_range}; do echo \\${i}; done" | bash`
 
-#echo "ECHOING RANGE: "$range >> ${LOGFILE} 2>&1
-# No redirects in loop
+#echo "ECHOING RANGE: " $range  #>> $get_logfile #debug
+
   for ip in $range; do
     # check if the system exists at all and ip pingeable
-    #echo "IP: $soip.$ip" #Debugging
+    #echo "SOIP: $soip.$ip" #Debugging
     fping -c 1 -q $soip.$ip 2>/dev/null
     # if fping received a response, the exit code will be 0
     if [ $? -eq 0 ]; then
@@ -236,6 +296,7 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
         # For printers we get
         # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
         # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
+		# No redirects in loop stout to config file
 		exec >> $PRINTCONF
         echo "define host{"
         # check if we got a Kyocera
@@ -268,7 +329,13 @@ range=`echo -e "for i in {$START_RANGE..$END_RANGE}; do echo \\${i}; done" | bas
 		fi
     fi
 done
-echo "I found" `expr $cnt - 1` "printers during my scan" >> ${LOGFILE} 2>&1
-echo "----------------------------------------------------------" >> ${LOGFILE} 2>&1
-#cat ${LOGFILE} | mail -s "Scanning logs" $email 2> /tmp/mailerrorp
-#rm ${LOGFILE}
+echo "I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
+echo "----------------------------------------------------------------------------------" >> $get_logfile
+
+#echo "starting shinken"
+
+. /usr/local/bin/shmotor "start"  > /dev/null 2>&1
+wait
+
+#rm $get_logfile
+
