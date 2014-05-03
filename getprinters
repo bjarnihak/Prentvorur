@@ -153,12 +153,10 @@ command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w 
 ###############################################################################
 END
 
-#stop shinken
-#echo anik2008 | sudo -S /usr/local/bin/shmotor  "stop"   #> /dev/null 2>&1
 
 # Log file handling
 get_logfile=/tmp/get_logfile
-touch $get_logfile
+echo "" > $get_logfile
 
 # Lots of problems from Windows and others making config files = fix it.
 for file in /home/vaktin/repo/*.txt ; do
@@ -206,9 +204,8 @@ email_prog="$(which email_sender)"
 
 # Various Parameters
 #=========================================================================
-timestamp=`date +%H:%M`
+timestamp=`date +%H:%M:%S`
 todays_date=`date +%d/%m/%Y`
-script_path=/home/vaktin/repo/
 
 # Main code
 #=========================================================================
@@ -262,7 +259,7 @@ if [[ -n $my_start_range ]] ; then
 	#echo "Got my_start_range :"
 else
 	my_start_range=$(dec2ip $decimal + 2 ) 
-	echo "Assinging Standard start"
+	#echo "Assinging Standard start"
 fi
 
 if [[ -n $my_end_range ]] ; then
@@ -270,7 +267,7 @@ if [[ -n $my_end_range ]] ; then
 	#echo "Got my_end_range :"
 else
 	my_end_range=$(dec2ip $decimal + 253 ) 
-	echo "Assinging Standard end" 
+	#echo "Assinging Standard end" 
 fi
 
 #prepare to feed this to snmp
@@ -322,19 +319,21 @@ range=`echo -e "for i in {$start_range..$end_range}; do echo \\${i}; done" | bas
         fi
         echo "  alias             $customer-printer-$cnt"
         #echo "  alias            $customer-printer-$cnt (`echo $response| cut -d ' ' -f 2-5` $cnt)"
-        echo "  host_name            `echo $response| cut -d ' ' -f 2-5` $cnt"
+        echo "  host_name                `echo $response| cut -d ' ' -f 2-5` $cnt"
         echo "  address              $soip.$ip"
         echo "}"
         cnt=`expr $cnt + 1`
 		fi
     fi
 done
-echo "I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
-echo "----------------------------------------------------------------------------------" >> $get_logfile
 
-echo "Restarting shinken" >> $get_logfile
+echo "---------------------------------------------------------------------------------------------">> $get_logfile
+echo "$timestamp: Finished creating definition: " >> $get_logfile
+echo "$timestamp: I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
 
+echo "$timestamp: Preparing Email" >> $get_logfile
+echo "$timestamp: Restarting shinken" >> $get_logfile
+echo "---------------------------------------------------------------------------------------------">> $get_logfile
+echo "                                    Shinken startup log                                        ">> $get_logfile
+echo ""
 . /usr/local/bin/shmotor "restart"  >> $get_logfile
-
-
-

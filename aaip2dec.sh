@@ -3,6 +3,8 @@
 # Translate IP to decimal +range where it creates my_start_range and my_end_range 
 # for our scan.
 # Get our subnet if it is not passed on.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games
+SHELL=/bin/bash
 #
 #First the basics
 #=========================================================================
@@ -10,11 +12,13 @@ log_file=/tmp/startup.log
 touch $log_file
 get_logfile=/tmp/get_logfile
 touch $get_logfile
+timestamp=`date +%H:%M:%S`
+todays_date=`date +%d/%m/%Y`
 
 # Empty the previous log with > on first occasion of redirect
-echo "----------------------------------------------------------------------------------" > ${log_file} 
-echo "Preparing Configuration of Prentvakt." >> ${log_file} 
-echo "----------------------------------------------------------------------------------" >> ${log_file} 
+echo "$timestamp: ----------------------------------------------------------------------------------" > ${log_file} 
+echo "$timestamp: Preparing Configuration of Prentvakt." >> ${log_file} 
+echo "$timestamp: ----------------------------------------------------------------------------------" >> ${log_file} 
 
 # Handling parameters from SD card. We used the boot on the 
 
@@ -51,7 +55,7 @@ my_end_range=$(printf ${my_parameter[5]} | awk -F '*|=' '{print $2}')
 #echo "--->" $customer
 #echo "--->" $subnet
 #echo "--->" $myip
-#echo "--->" $email
+#echo "--->" $emailcc
 #echo "--->" $my_start_range
 #echo "--->" $my_end_range
 
@@ -62,16 +66,12 @@ if [[ -z $email ]]; then
 	else
 		email_recipient="$email"
 fi
-email_subject_context="Initial startup email at $customer"
-email_sender="prentvakt@prentvorur.is" # Actually rewritten on send by ssmt
-template=/tmp/template
-email_prog="$(which email_sender)"
 
-# Various Parameters
-#=========================================================================
-timestamp=`date +%H:%M`
-todays_date=`date +%d/%m/%Y`
-script_path=/home/vaktin/repo/
+email_subject_context="Startup email at $customer DATE: $todays_date at $timestamp"
+email_from="prentvakt@prentvorur.is" # Actually rewritten on send by ssmt
+template=/tmp/template
+#email_prog="$(which email_sender)"
+email_prog=/usr/loca/bin/email_sender
 
 # Main code
 #=========================================================================
@@ -121,18 +121,18 @@ fi
 
 if [[ -n $my_start_range ]] ; then
 	my_start_range=$(dec2ip $decimal + $my_start_range )
-	#echo "Got my_start_range :"
+	#echo "$timestamp: Got my_start_range :"
 else
 	my_start_range=$(dec2ip $decimal + 2 ) 
-	#echo "Assinging Standard start"
+	#echo "$timestamp: Assinging Standard start"
 fi
 
 if [[ -n $my_end_range ]] ; then
 	my_end_range=$(dec2ip $decimal + $my_end_range )
-	#echo "Got my_end_range :"
+	#echo "$timestamp: Got my_end_range :"
 else
 	my_end_range=$(dec2ip $decimal + 253 ) 
-	#echo "Assinging Standard end" 
+	#echo "$timestamp: Assinging Standard end" 
 fi
 
 
@@ -149,33 +149,47 @@ Please give the system few minutes to initialize. \n\n ")
 
 
 echo "$body" >> ${log_file}
-echo "----------------------------------------------------------------------------------" >> ${log_file} 
-echo "Starting the run on the  $todays_date " >> ${log_file} 
-echo "At $timestamp hours" >> ${log_file} 
-echo "----------------------------------------------------------------------------------" >> ${log_file} 
-echo "Customer is: "$customer >> ${log_file} 
-echo "Emails are to be sent email to: " $email  >> ${log_file}
-echo "----------------------------------------------------------------------------------" >> ${log_file}
-echo "Systems current IP number is: " $myip  >> ${log_file}
-echo "Printers subnet is:" $soip >> ${log_file}
-echo "Printer scanning start range is: " $my_start_range  >> ${log_file}
-echo "Printer scanning end range is: " $my_end_range  >> ${log_file}
-echo "----------------------------------------------------------------------------------" >> ${log_file} 
-echo "" >> ${log_file}
-echo "Finding printers: $timestamp "  >> ${log_file} 
-sleep 1
+echo "$timestamp: ----------------------------------------------------------------------------------" >> ${log_file} 
+echo "$timestamp: Starting the run on the  $todays_date " >> ${log_file} 
+echo "$timestamp: At $timestamp hours" >> ${log_file} 
+echo "$timestamp: ----------------------------------------------------------------------------------" >> ${log_file} 
+echo "$timestamp: Customer is: "$customer >> ${log_file} 
+echo "$timestamp: Emails are to be sent email to: " $email  >> ${log_file}
+echo "$timestamp: ----------------------------------------------------------------------------------" >> ${log_file}
+echo "$timestamp: Systems current IP number is: " $myip  >> ${log_file}
+echo "$timestamp: Printers subnet is:" $soip >> ${log_file}
+echo "$timestamp: Printer scanning start range is: " $my_start_range  >> ${log_file}
+echo "$timestamp: Printer scanning end range is: " $my_end_range  >> ${log_file}
+echo "$timestamp: ----------------------------------------------------------------------------------" >> ${log_file} 
+#echo "$timestamp: " >> ${log_file}
+echo "$timestamp: Finding printers -> getprinters "  >> ${log_file} 
+
 # starting search
-#echo "starting searching - getprinters"
 
 . /home/vaktin/repo/getprinters >> ${log_file} 2>&1
 wait
 
-echo " " >> ${log_file} 
-echo "Finished definition: $timestamp" >> ${log_file} 
-echo "----------------------------------------------------------------------------------" >> ${log_file} 
 
+echo "---------------------------------------------------------------------------------------------" >> ${log_file} 
 cat $get_logfile >> ${log_file}
-rm $get_logfile
+#rm $get_logfile
 
-. "$email_prog" "$email_recipient" "$email_sender" "$email_subject_context " "$(cat ${log_file})" 
+/bin/sh "$email_prog" "$email_recipient" "$email_from" "$email_subject_context" "$(cat ${log_file})"  
 
+#debug
+#/usr/sbin/ssmtp $email <<EOF > /tmp/mailERR 2>&1
+#To: $email
+#From: contact-us@somedomain.co.uk 
+#Subject: mailtest
+#
+#---> $customer
+#---> $subnet
+#---> $myip
+#---> $email
+#---> $my_start_range
+#---> $my_end_range
+#
+#think about that!
+#
+#EOF
+#
