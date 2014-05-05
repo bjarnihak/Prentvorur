@@ -1,0 +1,65 @@
+ALTER TABLE "Customer";
+ALTER TABLE "Site";
+ALTER TABLE "Device";
+ALTER TABLE "Readings";
+ALTER TABLE "ReadingType";
+
+DROP TABLE "Customer";
+DROP TABLE "Site";
+DROP TABLE "Device";
+DROP TABLE "Readings";
+DROP TABLE "ReadingType";
+
+CREATE TABLE "Customer" (
+"PK" INT NOT NULL,
+"CustomerName" CHARACTER VARYING(255) NULL,
+"Address" CHARACTER VARYING(255) NULL,
+"SomeOtherBillingInformation" CHARACTER VARYING(255) NULL,
+PRIMARY KEY ("PK") 
+);
+
+CREATE TABLE "Site" (
+"PK" INT NOT NULL,
+"fk_Customer" INT NOT NULL,
+"SiteName" CHARACTER VARYING(255) NULL,
+"IPFrom" CHARACTER VARYING(255) NULL,
+"IPTo" CHARACTER VARYING(255) NULL,
+"OtherInterestingSiteInfoColumns" CHARACTER VARYING(255) NULL,
+PRIMARY KEY ("PK") 
+);
+
+CREATE TABLE "Device" (
+"PK" INT NOT NULL,
+"fk_Site" INT NOT NULL,
+"MACAddress" CHARACTER VARYING(255) NOT NULL,
+"IPAddress" CHARACTER VARYING(255) NOT NULL,
+"IDString" CHARACTER VARYING(255) NOT NULL,
+"Producer" CHARACTER VARYING(255) NOT NULL,
+"Location" CHARACTER VARYING(255) NULL,
+"OtherInterestingInfoColumns" CHARACTER VARYING(255) NULL,
+PRIMARY KEY ("PK") 
+);
+
+CREATE TABLE "Readings" (
+"PK" INT NOT NULL,
+"fk_ReadingType" INT NOT NULL,
+"SNMPValueString" CHARACTER VARYING(255) NOT NULL,
+"InterpretedValueForReporting" FLOAT(255) NULL,
+PRIMARY KEY ("PK") 
+);
+
+CREATE TABLE "ReadingType" (
+"PK" INT NOT NULL,
+"fk_Device" INT NOT NULL,
+"SNMPIDName" CHARACTER VARYING(255) NOT NULL,
+"SNMPIDType" CHARACTER VARYING(255) NOT NULL,
+"SNMPIDMetric" INT NOT NULL,
+PRIMARY KEY ("PK") 
+);
+
+
+ALTER TABLE "Site" ADD CONSTRAINT "fk_Customer_Site" FOREIGN KEY ("fk_Customer") REFERENCES "Customer" ("PK");
+ALTER TABLE "Device" ADD CONSTRAINT "fk_Device_Site_1" FOREIGN KEY ("fk_Site") REFERENCES "Site" ("PK");
+ALTER TABLE "Readings" ADD CONSTRAINT "fk_Readings_ReadingType_1" FOREIGN KEY ("fk_ReadingType") REFERENCES "ReadingType" ("PK");
+ALTER TABLE "ReadingType" ADD CONSTRAINT "fk_ReadingType_Device_1" FOREIGN KEY ("fk_Device") REFERENCES "Device" ("PK");
+
