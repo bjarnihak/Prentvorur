@@ -68,7 +68,7 @@ define host{
   check_interval        5                  ; Actively check the server every 5 minutes
   retry_interval        1                  ; Schedule host check retries at 1 minute intervals
   max_check_attempts    5                  ; Check each server 10 times (max)
-  #check_command         check_hpjd         ; Default command to check if servers are "alive"
+  check_command         check_hpjd         ; Default command to check if servers are "alive"
   check_command         check_host_alive   ; Default command to check if servers are "alive"
   notification_period   none               ; printers enter "sleep" mode each night - they go "down"
   notification_interval 240                ; Resend notifications every 120 minutes
@@ -132,7 +132,7 @@ define service{
 use generic-service 
 service_description Toner Supply 
 hostgroup_name (generic-printers-so|HP-printers-so|epson-printers-so)
-check_command check_snmp_printer!public!"CONSUM ALL"!20!10 
+check_command check_snmp_printer!public!"CONSUM ALL"!20!10 $LONGSERVICEOUTPUT$ 
 } 
 
 define service{ 
@@ -144,7 +144,7 @@ check_command check_snmp_printer!public!"PAGECOUNT"
 
 define command{ 
 command_name check_snmp_printer 
-command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w $ARG3$ -c $ARG4$  
+command_line $USER1$/check_snmp_printer -H $HOSTADDRESS$ -C $ARG1$ -x $ARG2$ -w $ARG3$ -c $ARG4$ 
 } 
 
 
@@ -280,60 +280,67 @@ range=`echo -e "for i in {$start_range..$end_range}; do echo \\${i}; done" | bas
 
 #echo "ECHOING RANGE: " $range  #>> $get_logfile #debug
 
-  for ip in $range; do
-    # check if the system exists at all and ip pingeable
-    #echo "SOIP: $soip.$ip" #Debugging
-    fping -c 1 -q $soip.$ip 2>/dev/null
+for ip in $range; do
+  # check if the system exists at all and ip pingeable
+  #echo "SOIP: $soip.$ip" #Debugging
+  fping -c 1 -q $soip.$ip 2>/dev/null
     # if fping received a response, the exit code will be 0
+  if [ $? -eq 0 ]; then
+	macaddress=`snmpget -r 1 -v 1 -c public $soip.$ip IF-MIB::ifPhysAddress.1 -Ov | awk -F'STRING: ' '{print $NF}' 2>/dev/null`
+
     if [ $? -eq 0 ]; then
       #snmpget -v 1 -c public 192.168.91.4 HOST-RESOURCES-MIB::hrDeviceDescr.1 -Ov
-      response=`snmpget -r 1 -v 1 -c public $soip.$ip HOST-RESOURCES-MIB::hrDeviceDescr.1 -Ov 2>/dev/null` 
+      response=`snmpget -r 1 -v 1 -c public $soip.$ip HOST-RESOURCES-MIB::hrDeviceDescr.1 2>/dev/null` 
       # if snmpget received a response, the exit code will be 0
+
       if [ $? -eq 0 ]; then
         # For printers we get
         # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
         # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
 		# No redirects in loop stout to config file
 		exec >> $PRINTCONF
-        echo "define host{"
-        # check if we got a Kyocera
-        echo $response| grep -q 'STRING: LS-'
-        if [ $? -eq 0 ]; then echo "  use                   kyocera-printer-so"
-        else
+          echo "define host{"
+		  # check if we got a Kyocera
+
+          echo $response| grep -q 'STRING: LS-'
+          if [ $? -eq 0 ]; then echo "  use                   kyocera-printer-so"
+          else
           # check if we got a Xerox
+
           echo $response| grep -q 'STRING: FUJI XEROX'
           if [ $? -eq 0 ]; then echo "  use                   xerox-printer-so"
-	  else
-            # check if we got a Epson
-            echo $response| grep -q 'STRING: EPSON'
-            if [ $? -eq 0 ]; then echo "  use                   epson-printer-so"
-	    else
-		# check if we got a Epson
-            	echo $response| grep -q 'STRING: HP\|STRING: Deskjet\|STRING: Officejet'
-            	if [ $? -eq 0 ]; then echo "  use                   HP-printer-so"
-            	else
-              		         echo "  use                   generic-printer-so"
-	    fi
-           fi
-          fi
+		  else
+          # check if we got a Epson
+		  echo $response| grep -q 'STRING: EPSON'
+           if [ $? -eq 0 ]; then echo "  use                   epson-printer-so"
+	      else
+		  # check if we got a Epson
+          echo $response| grep -q 'STRING: HP\|STRING: Deskjet\|STRING: Officejet'
+          if [ $? -eq 0 ]; then echo "  use                   HP-printer-so"
+          else
+          echo "  use                   generic-printer-so"
+		  fi
         fi
-        echo "  alias             $customer-printer-$cnt"
-        #echo "  alias            $customer-printer-$cnt (`echo $response| cut -d ' ' -f 2-5` $cnt)"
-        echo "  host_name                `echo $response| cut -d ' ' -f 2-5` $cnt"
-        echo "  address              $soip.$ip"
-        echo "}"
-        cnt=`expr $cnt + 1`
 		fi
-    fi
+    echo "  alias                $customer-printer-$cnt"
+    echo "  host_name            `echo $response | awk -F'STRING: ' '{print $NF}'`"
+    echo "  address              $soip.$ip"
+	echo " _macaddress	       $macaddress"
+    echo "}"
+    cnt=`expr $cnt + 1`
+      fi
+	fi
+	fi
+   fi
 done
 
-echo "---------------------------------------------------------------------------------------------">> $get_logfile
-echo "$timestamp: Finished creating definition: " >> $get_logfile
-echo "$timestamp: I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
-
-echo "$timestamp: Preparing Email" >> $get_logfile
-echo "$timestamp: Restarting shinken" >> $get_logfile
-echo "---------------------------------------------------------------------------------------------">> $get_logfile
-echo "                                    Shinken startup log                                        ">> $get_logfile
-echo ""
-. /usr/local/bin/shmotor "restart"  >> $get_logfile
+#echo "---------------------------------------------------------------------------------------------">> $get_logfile
+#echo "$timestamp: Finished creating definition: " >> $get_logfile
+#echo "$timestamp: I found " `expr $cnt - 1` "printers during scan" >> $get_logfile
+#
+#echo "$timestamp: Preparing Email" >> $get_logfile
+#echo "$timestamp: Restarting shinken" >> $get_logfile
+#echo "---------------------------------------------------------------------------------------------">> $get_logfile
+#echo "                                    Shinken startup log                                        ">> $get_logfile
+#echo ""
+#. /usr/local/bin/shmotor "restart"  >> $get_logfile

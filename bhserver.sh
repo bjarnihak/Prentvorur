@@ -163,160 +163,24 @@ for ip in $range; do
     # if snmpget received a response, the exit code will be 0
 		if [ $? -eq 0 ]; then 
 			#bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-			#bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-			readarray consum < <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print  "'"$dbtimestamp"', '$customer', '$location' ,'"$response"'," $1  "," $6""}')
-			readarray pagecount < <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "DEVICE" | grep '%' | awk -F ' ' '{print  "'"$dbtimestamp"', '$customer', '$location' ,'"$response"'," $1  "," $6""}')
+			bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" ) #| grep '%' | awk -F ' ' '{print "," $6}')
+			#readarray consum < <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" #| grep '%' | awk -F ' ' '{print  "'"$dbtimestamp"', '$customer', '$location' ,'"$response"'," $1  "," $6""}')
+			#readarray consum < <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" )
+			#| grep '%' | awk -F ' ' '{print  '$customer', '$location' ,'"$response"'," $1  "," $6""}')
 			#readarray bablefish < <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "\"INSERT INTO '$dbtable' ( runtime, cid, customer , location, printer, consum, status ) VALUES ( '"$dbtimestamp"', '$customer', '$location' ,'"$response"'," $1  "," $6")"";\""}')
 		fi 
-	  fi
+		echo $bablefish
+	fi
 done 
 
-for i in "${consum[@]}" ; do 
-	echo $i
-done
-for i in "${pagecount[@]}" ; do 
-	echo $i
-done
 
-
-
-
-
-# OK PRINTER_STATUS=$(snmpget -v1 -Ovq -c $COMMUNITY $HOST_NAME 1.3.6.1.2.1.25.3.5.1.1.1 2>/dev/null)
-
-
-
-
-
-
-
-
-
-
-	#insrt=`printf $i ` 
-#	/usr/bin/mysql -u$dbuser -p$dbpw $dbname -e "INSERT INTO $dbtable ( runtime, cid, customer , location, printer, consum, status ) VALUES( now(), $customer, $location , "EPSON Epson Stylus Office BX320FW", Black2 ,88);"
-
-#INSERT INTO my_table ( runtime, cid, customer , location, printer, consum, status ) VALUES (NOW(), LOAD_FILE('/tmp/my_file.txt'));
-
-#INSERT INTO my_table (stamp, what) VALUES (NOW(), LOAD_FILE('/tmp/my_file.txt'));
-#LOAD DATA LOCAL INFILE "myfile.csv" INTO TABLE tablename 
-#FIELDS TERMINATED BY ','
-#LINES TERMINATED BY '\n'
-#column name, column name);
-
-#for record in ${bablefish[@]}; do
-#mysql $dbname -u$dbuser -p$dbpw $record
-#echo "Done: "$record
+#for i in "${consum[*]}" ; do 
+#	echo $i
 #done
 
 
-#cnt=${#bablefish[@]}
-#echo $cnt
-
-#mysql $dbname -u$dbuser -p$dbpw -e 
-
-#(datetime, cid, customer , location, printer, consum, status )
-#
-#INSERT INTO TABLE X VALUES(2406613229,EPSON Epson Stylus Office BX320FW,Black,100%)
-#INSERT INTO TABLE X VALUES(2406613229,EPSON Epson Stylus Office BX320FW,Black#2,88%)
-#INSERT INTO TABLE X VALUES(2406613229,EPSON Epson Stylus Office BX320FW,Magenta,55%)
-#INSERT INTO TABLE X VALUES(2406613229,EPSON Epson Stylus Office BX320FW,Cyan,22%)
-#INSERT INTO TABLE X VALUES(2406613229,EPSON Epson Stylus Office BX320FW,Yellow,57%)
-#
-
-#		  #echo "Found a got response" 
-#		    bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print $response "," $6}')
-#		fi
-#		printf $response","$bablefish
-#	fi
-#done
-
- #echo ${bablefish[*]}\n
 
 
-
-
-	# For printers we get
-    # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
-    # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
-	
-#	echo $response | grep -q 'EPSON\|Epson'
-#		if [ $? -eq 0 ]; then 
-#		  echo "Found Epson Printer" 
-#		  bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-#		else
-#		#Look for Kyocera Printer
-#		echo $response | grep -q 'LS-'
-#		  if [ $? -eq 0 ]; then
-#		  echo "Found Kyocera Printer"
-#		  bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-#		else
-#		# Look for FujiXerox Printer
-#		  echo $response | grep -q 'FUJI XEROX'
-#		  if [ $? -eq 0 ]; then	
-#		  echo "Xerox Printer"
-#		  bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-#		# Look for HP printer
-#		else
-#		  echo $response | grep -q 'HP\|Deskjet\|Officejet'
-#		  if [ $? -eq 0 ]; then
-#		  echo "HP Printer"
-#		  bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-#		# Nothing special found call it generic
-#		else
-#		  echo "generic-printer"
-#		  bablefish=$(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "," $6}')
-#		  fi
-#		fi
-#	  fi
-#	fi
-#fi
-#done
-
-#echo "Done"
-#echo '"'$response'"' $bablefish
-
-
-#	  if [[ -n $response ]]; then
-#		readarray table_insert <  <(/home/vaktin/repo/check_snmp_printer -H $soip.$ip -C public -x "CONSUM ALL" | grep '%' | awk -F ' ' '{print "INSERT INTO TABLE X VALUES('$customer','"$response"'," $1 "," $6")"}')
-#	  fi 
-#	fi
-#done
-#echo ${table_insert[4]}
-#
-#echo $response
-
-#        # For printers we get
-#        # typical response 1 (Kyocera Printer)   -> STRING: LS-C5016N
-#        # typical response 2 (FujiXerox Printer) -> STRING: FUJI XEROX DocuCentre-III C440 v  3.  7.  1 Multifunction System
-#		# No redirects in loop stout to config file
-#		exec >> $PRINTCONF
-#        echo "define host{"
-#        # check if we got a Kyocera
-#        echo $response| grep -q 'STRING: LS-'
-#        if [ $? -eq 0 ]; then echo "  use                   kyocera-printer-so"
-#        else
-#          # check if we got a Xerox
-#          echo $response| grep -q 'STRING: FUJI XEROX'
-#          if [ $? -eq 0 ]; then echo "  use                   xerox-printer-so"
-#	  else
-#            # check if we got a Epson
-#            echo $response| grep -q 'STRING: EPSON'
-#            if [ $? -eq 0 ]; then echo "  use                   epson-printer-so"
-#	    else
-#		# check if we got a Epson
-#            	echo $response| grep -q 'STRING: HP\|STRING: Deskjet\|STRING: Officejet'
-#            	if [ $? -eq 0 ]; then echo "  use                   HP-printer-so"
-#            	else
-#              		         echo "  use                   generic-printer-so"
-#	    fi
-#           fi
-#          fi
-#        fi
-#        echo "  alias             $customer-printer-$cnt"
-#        #echo "  alias            $customer-printer-$cnt (`echo $response| cut -d ' ' -f 2-5` $cnt)"
-#        echo "  host_name                `echo $response| cut -d ' ' -f 2-5` $cnt"
-#        echo "  address              $soip.$ip"
 #        echo "}"
 #        cnt=`expr $cnt + 1`
 #		fi
