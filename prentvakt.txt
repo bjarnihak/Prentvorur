@@ -1,6 +1,17 @@
-CUSTOMER=2406613229
-SUBNET=
-MYIP=
-EMAIL=bh@islaw.is
-START_RANGE=140
-END_RANGE=145
+#==================================================
+# Do not change the values in Default section     #
+# they are fallback if nothings else in defined.  #
+#==================================================
+[DEFAULT]
+customer = 240661-3229
+email = bh@islaw.is
+cc = vaktin@prentvorur.net
+interface = eth0
+start_range = 45
+end_range = 145
+
+[OPTIONS]
+email = bh@islaw.is
+interface = eth0
+# We use the full ip 192.168.50.0
+subnet = 
