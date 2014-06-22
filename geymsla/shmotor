@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Restart shinken
+
+case "$1" in
+    start)
+        echo -n "Starting Shinken"
+		service shinken start 
+        ;;
+    stop)
+       
+		service shinken stop 
+        ;;
+    restart)
+        service shinken restart 
+        ;;
+esac
